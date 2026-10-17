@@ -210,6 +210,80 @@
     fit();
     requestAnimationFrame(function(){ window.print(); });
   });
+  /* إرسال الخطاب عبر قائمة المشاركة في الجهاز (البريد) */
+  var SHARE_LABEL = $('share').textContent;
+  var readyFile = null;
+  function shareState(label, busy){
+    $('share').textContent = label;
+    $('share').disabled = !!busy;
+  }
+  function resetShare(){ readyFile = null; shareState(SHARE_LABEL); }
+
+  function makePdf(){
+    var pg = $('page');
+    return html2pdf().set({
+      margin: 0,
+      image: {type: 'jpeg', quality: 0.95},
+      /* foreignObjectRendering: يستخدم محرك المتصفح فيُظهر النص العربي وعلامات الترقيم بشكل صحيح */
+      /* height: أقل بقليل من A4 (1122.5px) حتى لا تُضاف صفحة ثانية فارغة بسبب التقريب */
+      html2canvas: {scale: 2, foreignObjectRendering: true, backgroundColor: '#fff',
+        height: pg.offsetHeight - 1,
+        onclone: function(doc){ doc.getElementById('page').style.boxShadow = 'none'; }},
+      jsPDF: {unit: 'mm', format: 'a4', orientation: 'portrait'}
+    }).from(pg).outputPdf('blob');
+  }
+
+  function shareFile(file){
+    var data = {
+      files: [file],
+      title: 'خطاب التدريب التعاوني',
+      text: 'خطاب التدريب التعاوني - ' + val('name') + '\nالبريد: ' + email()
+    };
+    return navigator.share(data).then(resetShare, function(e){
+      if (e && e.name === 'AbortError'){ resetShare(); return; }
+      /* انتهت مهلة نقرة المستخدم أثناء التوليد: نطلب نقرة ثانية */
+      readyFile = file;
+      shareState('الخطاب جاهز — اضغط للإرسال');
+    });
+  }
+
+  function downloadAndMail(blob, name){
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+    location.href = 'mailto:' + encodeURIComponent(email()) +
+      '?subject=' + encodeURIComponent('خطاب التدريب التعاوني') +
+      '&body=' + encodeURIComponent('مرفق خطاب التدريب التعاوني (أرفق الملف ' + name + ' الذي تم تنزيله).');
+    resetShare();
+  }
+
+  $('share').addEventListener('click', function(){
+    if (readyFile){ shareFile(readyFile); return; }
+    var r = validate(true);
+    if (!r.ok){ if (r.first) r.first.focus(); return; }
+    if (typeof html2pdf === 'undefined'){
+      alert('تعذر تحميل أداة توليد الملف. تحقق من الاتصال بالإنترنت ثم أعد المحاولة.');
+      return;
+    }
+    showLetter();
+    render();
+    fit();
+    shareState('جاري تجهيز الخطاب…', true);
+    var name = 'خطاب-التدريب-' + val('sid') + '.pdf';
+    makePdf().then(function(blob){
+      var file = new File([blob], name, {type: 'application/pdf'});
+      if (navigator.canShare && navigator.canShare({files: [file]})) return shareFile(file);
+      downloadAndMail(blob, name);
+    }).catch(function(){
+      resetShare();
+      alert('تعذر توليد الخطاب. أعد المحاولة أو استخدم زر «توليد PDF».');
+    });
+  });
+  $('f').addEventListener('input', resetShare);
+  $('f').addEventListener('change', resetShare);
+
   $('reset').addEventListener('click', function(){
     FIELDS.forEach(function(k){ $(k).value = ''; });
     document.querySelector('input[name=g][value=n]').checked = true;

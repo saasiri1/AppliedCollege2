@@ -137,6 +137,10 @@
   .sign .t{font-weight:700;white-space:nowrap}
   .sign .m{font-weight:700;margin-top:2mm;direction:ltr;unicode-bidi:isolate}
 
+  /* حاوية html2pdf المؤقتة: اتجاه ltr حتى لا تُزاح الورقة في الشاشات الضيقة */
+  .html2pdf__overlay{direction:ltr}
+  .page{direction:rtl}
+
   /* ===== الطباعة ===== */
   @page{size:A4 portrait;margin:0}
   @media print{
