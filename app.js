@@ -5,9 +5,9 @@
   var STORE  = 'coopLetter.v3';
 
   /* بيانات التدريب الثابتة */
-  var TERM      = 'الفصل الأول 1448';
-  var TERM_LONG = 'الفصل الدراسي الأول 1448';
-  var END       = '8 رجب 1448';
+  var TERM      = 'الفصل الثاني 1448';
+  var TERM_LONG = 'الفصل الدراسي الثاني 1448';
+  var END       = '14 ذو الحجة 1448';
 
   function gender(){
     var r = document.querySelector('input[name=g]:checked');
