@@ -217,18 +217,54 @@
   }
   function resetShare(){ readyFile = null; shareState(SHARE_LABEL); }
 
-  function makePdf(){
+  /* Safari (الآيفون) قد يرسم الورقة فارغة أو بلا الترويسة في المحاولة الأولى،
+     لذلك نعيد الرسم حتى تظهر الترويسة والنص ثم نبني الـ PDF من الصورة الناتجة */
+  function renderPage(){
     var pg = $('page');
     return html2pdf().set({
-      margin: 0,
-      image: {type: 'jpeg', quality: 0.95},
       /* foreignObjectRendering: يستخدم محرك المتصفح فيُظهر النص العربي وعلامات الترقيم بشكل صحيح */
       /* height: أقل بقليل من A4 (1122.5px) حتى لا تُضاف صفحة ثانية فارغة بسبب التقريب */
       html2canvas: {scale: 2, foreignObjectRendering: true, backgroundColor: '#fff',
-        height: pg.offsetHeight - 1,
-        onclone: function(doc){ doc.getElementById('page').style.boxShadow = 'none'; }},
-      jsPDF: {unit: 'mm', format: 'a4', orientation: 'portrait'}
-    }).from(pg).outputPdf('blob');
+        height: pg.offsetHeight - 1, logging: false,
+        onclone: function(doc){ doc.getElementById('page').style.boxShadow = 'none'; }}
+    }).from(pg).toCanvas().get('canvas');
+  }
+  function inked(c, y){
+    var row = c.getContext('2d').getImageData(0, Math.round(c.height * y), c.width, 1).data, n = 0;
+    for (var i = 0; i < row.length; i += 4) if (row[i] < 200) n++;
+    return n;
+  }
+  function complete(c){
+    /* شريط الزخرفة أعلى الترويسة + نص في منتصف الورقة */
+    var body = 0;
+    for (var y = 0.3; y < 0.6; y += 0.01) body += inked(c, y);
+    var band = Math.max(inked(c, 0.025), inked(c, 0.03), inked(c, 0.035));
+    return band > c.width * 0.2 && body > 0;
+  }
+  function makePdf(){
+    /* إذا كانت الصفحة منزلقة للأسفل يرسم Safari منطقة خاطئة فيخرج الملف فارغاً،
+       لذلك نصعد لأعلى الصفحة أثناء التوليد ثم نعود لنفس الموضع */
+    var sx = window.scrollX, sy = window.scrollY;
+    var back = function(){ window.scrollTo(sx, sy); };
+    window.scrollTo(0, 0);
+    return buildPdf().then(function(blob){ back(); return blob; },
+                           function(e){ back(); throw e; });
+  }
+  function buildPdf(){
+    var tries = 0;
+    function attempt(){
+      return renderPage().then(function(c){
+        if (complete(c) || ++tries >= 5) return c;
+        return attempt();
+      });
+    }
+    return attempt().then(function(c){
+      return html2pdf().set({
+        margin: 0,
+        image: {type: 'jpeg', quality: 0.95},
+        jsPDF: {unit: 'mm', format: 'a4', orientation: 'portrait'}
+      }).from(c, 'canvas').outputPdf('blob');
+    });
   }
 
   function shareFile(file){
