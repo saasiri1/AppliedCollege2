@@ -1,6 +1,6 @@
 (function(){
   var $ = function(id){ return document.getElementById(id); };
-  var FIELDS = ['org','name','sid','sec','college','major','mobile'];
+  var FIELDS = ['org','name','sid','college','major','mobile'];
   var MAILDOMAIN = '@kku.edu.sa';
   var STORE  = 'coopLetter.v3';
 
@@ -52,7 +52,6 @@
     $('v_major').innerHTML = '<b>التخصص:</b> ' + escapeHtml(val('major'));
 
     $('v_mobile').innerHTML = '<b>الجوال:</b> ' + escapeHtml(val('mobile'));
-    $('v_sec').innerHTML    = '<b>رقم الشعبة:</b> ' + escapeHtml(val('sec'));
     $('v_email').innerHTML  = '<b>البريد الإلكتروني:</b> <span class="mail">' + escapeHtml(email()) + '</span>';
     $('v_college').innerHTML = '<b>الكلية:</b> ' + escapeHtml(val('college'));
     $('emailPreview').textContent = email() || '—';
@@ -135,7 +134,6 @@
      test:function(v){ var n = v.split(/\s+/).filter(Boolean).length; return n >= 2 && n <= 5; },
       msg:'الاسم الرباعي'},
     {id:'sid',    label:'الرقم الجامعي', test:function(v){ return /^44[0-9]{7}$/.test(v); }, msg:'يجب أن يتكون من 9 أرقام ويبدأ بـ 44'},
-    {id:'sec',    label:'رقم الشعبة',    test:function(v){ return /^[0-9]{1,8}$/.test(v); },  msg:'أرقام فقط'},
     {id:'college', label:'الكلية'},
     {id:'major',  label:'التخصص'},
     {id:'mobile', label:'رقم الجوال',    test:function(v){ return /^05[0-9]{8}$/.test(v); },  msg:'يبدأ بـ 05 ولا يتجاوز 10 أرقام'}
@@ -172,7 +170,7 @@
     return {ok: !problems.length, first: first};
   }
 
-  var DIGITS = {sid:9, sec:8, mobile:10};
+  var DIGITS = {sid:9, mobile:10};
   Object.keys(DIGITS).forEach(function(id){
     $(id).addEventListener('input', function(){
       var clean = this.value.replace(/[^0-9]/g, '');
