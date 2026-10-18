@@ -311,14 +311,23 @@
     a.download = file.name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
-    location.href = 'mailto:' + encodeURIComponent(email()) +
+    var mail = 'mailto:' + email() +
       '?subject=' + encodeURIComponent('خطاب التدريب التعاوني') +
       '&body=' + encodeURIComponent('مرفق خطاب التدريب التعاوني (أرفق الملف ' + file.name + ' الذي تم تنزيله).');
+    /* مهلة قصيرة حتى لا يُلغى التنزيل عند فتح برنامج البريد */
+    setTimeout(function(){ location.href = mail; }, 600);
     resetShare();
   }
 
+  /* قائمة المشاركة للجوال فقط: في ويندوز يصل المرفق إلى Outlook فارغاً (no_name)،
+     لذلك نُنزّل الملف في الكمبيوتر ونفتح رسالة جاهزة ببريد الطالب والعنوان */
+  function isMobile(){
+    if (navigator.userAgentData && navigator.userAgentData.mobile) return true;
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
   function send(file){
-    if (navigator.canShare && navigator.canShare({files: [file]})) return shareFile(file);
+    if (isMobile() && navigator.canShare && navigator.canShare({files: [file]})) return shareFile(file);
     downloadAndMail(file);
   }
 
