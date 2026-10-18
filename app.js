@@ -210,28 +210,27 @@
   });
   /* إرسال الخطاب عبر قائمة المشاركة في الجهاز (البريد) */
   var SHARE_LABEL = $('share').textContent;
-  var readyFile = null;
   function shareState(label, busy){
     $('share').textContent = label;
     $('share').disabled = !!busy;
   }
-  function resetShare(){ readyFile = null; shareState(SHARE_LABEL); }
+  function resetShare(){ shareState(SHARE_LABEL); }
 
-  /* Safari (الآيفون) قد يرسم الورقة فارغة أو بلا الترويسة في المحاولة الأولى،
+  /* Safari (الآيفون) قد يرسم الورقة بلا الترويسة في أول محاولتين،
      لذلك نعيد الرسم حتى تظهر الترويسة والنص ثم نبني الـ PDF من الصورة الناتجة */
   function renderPage(){
-    var pg = $('page');
     return html2pdf().set({
-      /* foreignObjectRendering: يستخدم محرك المتصفح فيُظهر النص العربي وعلامات الترقيم بشكل صحيح */
-      /* height: أقل بقليل من A4 (1122.5px) حتى لا تُضاف صفحة ثانية فارغة بسبب التقريب */
+      /* foreignObjectRendering: يستخدم محرك المتصفح فيُظهر النص العربي وعلامات الترقيم بشكل صحيح
+         scrollX/scrollY: بدونها يرسم Safari منطقة خاطئة (فارغة) إذا كانت الصفحة منزلقة للأسفل
+         height: أقل بقليل من A4 (1122.5px) حتى لا تُضاف صفحة ثانية فارغة بسبب التقريب */
       html2canvas: {scale: 2, foreignObjectRendering: true, backgroundColor: '#fff',
-        height: pg.offsetHeight - 1, logging: false,
+        width: 794, height: 1122, scrollX: 0, scrollY: 0, logging: false,
         onclone: function(doc){ doc.getElementById('page').style.boxShadow = 'none'; }}
-    }).from(pg).toCanvas().get('canvas');
+    }).from($('page')).toCanvas().get('canvas');
   }
   function inked(c, y){
     var row = c.getContext('2d').getImageData(0, Math.round(c.height * y), c.width, 1).data, n = 0;
-    for (var i = 0; i < row.length; i += 4) if (row[i] < 200) n++;
+    for (var i = 0; i < row.length; i += 4) if (row[i] < 200 && row[i + 3] > 200) n++;
     return n;
   }
   function complete(c){
@@ -241,20 +240,11 @@
     var band = Math.max(inked(c, 0.025), inked(c, 0.03), inked(c, 0.035));
     return band > c.width * 0.2 && body > 0;
   }
-  function makePdf(){
-    /* إذا كانت الصفحة منزلقة للأسفل يرسم Safari منطقة خاطئة فيخرج الملف فارغاً،
-       لذلك نصعد لأعلى الصفحة أثناء التوليد ثم نعود لنفس الموضع */
-    var sx = window.scrollX, sy = window.scrollY;
-    var back = function(){ window.scrollTo(sx, sy); };
-    window.scrollTo(0, 0);
-    return buildPdf().then(function(blob){ back(); return blob; },
-                           function(e){ back(); throw e; });
-  }
   function buildPdf(){
     var tries = 0;
     function attempt(){
       return renderPage().then(function(c){
-        if (complete(c) || ++tries >= 5) return c;
+        if (complete(c) || ++tries >= 6) return c;
         return attempt();
       });
     }
@@ -267,6 +257,35 @@
     });
   }
 
+  /* الآيفون لا يفتح قائمة المشاركة إلا بعد نقرة حديثة (ثوانٍ قليلة)، وتوليد الملف يأخذ وقتاً،
+     لذلك نجهّز الملف في الخلفية حين تكتمل البيانات فتفتح القائمة فور الضغط على الزر */
+  var pdfCache = {};
+  function dataKey(){
+    return JSON.stringify(FIELDS.map(function(k){ return $(k).value; }).concat(gender(), TERM_LONG, END));
+  }
+  function prepare(){
+    var key = dataKey();
+    if (pdfCache.key === key) return pdfCache.promise;
+    var entry = {key: key, file: null};
+    var name = 'خطاب-التدريب-' + val('sid') + '.pdf';
+    entry.promise = buildPdf().then(function(blob){
+      entry.file = new File([blob], name, {type: 'application/pdf'});
+      return entry.file;
+    });
+    entry.promise.catch(function(){ if (pdfCache === entry) pdfCache = {}; });
+    pdfCache = entry;
+    return entry.promise;
+  }
+  var prepTimer = null;
+  function schedulePrepare(){
+    clearTimeout(prepTimer);
+    prepTimer = setTimeout(function(){
+      if (typeof html2pdf !== 'undefined' && validate(false).ok) prepare().catch(function(){});
+    }, 800);
+  }
+
+  function errText(e){ return e ? (e.name || '') + (e.message ? ': ' + e.message : '') : ''; }
+
   function shareFile(file){
     var data = {
       files: [file],
@@ -275,26 +294,34 @@
     };
     return navigator.share(data).then(resetShare, function(e){
       if (e && e.name === 'AbortError'){ resetShare(); return; }
-      /* انتهت مهلة نقرة المستخدم أثناء التوليد: نطلب نقرة ثانية */
-      readyFile = file;
-      shareState('الخطاب جاهز — اضغط للإرسال');
+      if (e && e.name === 'NotAllowedError'){
+        /* انتهت مهلة النقرة أثناء التوليد: الملف جاهز الآن ونقرة ثانية تفتح القائمة فوراً */
+        shareState('الخطاب جاهز — اضغط للإرسال');
+        return;
+      }
+      resetShare();
+      alert('تعذر فتح قائمة المشاركة.\n' + errText(e));
     });
   }
 
-  function downloadAndMail(blob, name){
+  function downloadAndMail(file){
     var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
+    a.href = URL.createObjectURL(file);
+    a.download = file.name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
     location.href = 'mailto:' + encodeURIComponent(email()) +
       '?subject=' + encodeURIComponent('خطاب التدريب التعاوني') +
-      '&body=' + encodeURIComponent('مرفق خطاب التدريب التعاوني (أرفق الملف ' + name + ' الذي تم تنزيله).');
+      '&body=' + encodeURIComponent('مرفق خطاب التدريب التعاوني (أرفق الملف ' + file.name + ' الذي تم تنزيله).');
     resetShare();
   }
 
+  function send(file){
+    if (navigator.canShare && navigator.canShare({files: [file]})) return shareFile(file);
+    downloadAndMail(file);
+  }
+
   $('share').addEventListener('click', function(){
-    if (readyFile){ shareFile(readyFile); return; }
     var r = validate(true);
     if (!r.ok){ if (r.first) r.first.focus(); return; }
     if (typeof html2pdf === 'undefined'){
@@ -302,21 +329,17 @@
       return;
     }
     showLetter();
-    render();
     fit();
+    /* الملف جاهز مسبقاً: نشارك مباشرة ضمن نفس النقرة */
+    if (pdfCache.key === dataKey() && pdfCache.file){ send(pdfCache.file); return; }
     shareState('جاري تجهيز الخطاب…', true);
-    var name = 'خطاب-التدريب-' + val('sid') + '.pdf';
-    makePdf().then(function(blob){
-      var file = new File([blob], name, {type: 'application/pdf'});
-      if (navigator.canShare && navigator.canShare({files: [file]})) return shareFile(file);
-      downloadAndMail(blob, name);
-    }).catch(function(){
+    prepare().then(send).catch(function(e){
       resetShare();
-      alert('تعذر توليد الخطاب. أعد المحاولة أو استخدم زر «توليد PDF».');
+      alert('تعذر توليد الخطاب. أعد المحاولة أو استخدم زر «توليد PDF».\n' + errText(e));
     });
   });
-  $('f').addEventListener('input', resetShare);
-  $('f').addEventListener('change', resetShare);
+  $('f').addEventListener('input', function(){ resetShare(); schedulePrepare(); });
+  $('f').addEventListener('change', function(){ resetShare(); schedulePrepare(); });
 
   $('reset').addEventListener('click', function(){
     FIELDS.forEach(function(k){ $(k).value = ''; });
