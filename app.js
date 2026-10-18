@@ -244,8 +244,10 @@
     var tries = 0;
     function attempt(){
       return renderPage().then(function(c){
-        if (complete(c) || ++tries >= 6) return c;
-        return attempt();
+        if (complete(c)) return c;
+        if (++tries < 6) return attempt();
+        /* لا نُرسل ملفاً فارغاً أبداً */
+        var e = new Error('blank page'); e.name = 'BlankPdf'; throw e;
       });
     }
     return attempt().then(function(c){
@@ -281,7 +283,7 @@
   function schedulePrepare(){
     clearTimeout(prepTimer);
     prepTimer = setTimeout(function(){
-      if (typeof html2pdf !== 'undefined' && validate(false).ok) prepare().catch(function(){});
+      if (isMobile() && typeof html2pdf !== 'undefined' && validate(false).ok) prepare().catch(function(){});
     }, 800);
   }
 
@@ -305,18 +307,37 @@
     });
   }
 
+  function openMail(note){
+    location.href = 'mailto:' + email() +
+      '?subject=' + encodeURIComponent('خطاب التدريب التعاوني') +
+      '&body=' + encodeURIComponent('مرفق خطاب التدريب التعاوني.\n(' + note + ')');
+  }
   function downloadAndMail(file){
     var a = document.createElement('a');
     a.href = URL.createObjectURL(file);
     a.download = file.name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
-    var mail = 'mailto:' + email() +
-      '?subject=' + encodeURIComponent('خطاب التدريب التعاوني') +
-      '&body=' + encodeURIComponent('مرفق خطاب التدريب التعاوني (أرفق الملف ' + file.name + ' الذي تم تنزيله).');
     /* مهلة قصيرة حتى لا يُلغى التنزيل عند فتح برنامج البريد */
-    setTimeout(function(){ location.href = mail; }, 600);
+    setTimeout(function(){ openMail('أرفق الملف ' + file.name + ' الذي تم تنزيله'); }, 600);
     resetShare();
+  }
+
+  /* الكمبيوتر: رسم الورقة داخل الصفحة قد يخرج فارغاً في بعض المتصفحات (والمشاركة تصل إلى Outlook فارغة)،
+     لذلك نستخدم نافذة الطباعة (حفظ كـ PDF) ثم نفتح رسالة جاهزة ببريد الطالب والعنوان */
+  function printAndMail(){
+    showLetter();
+    render();
+    fit();
+    var done = false;
+    var after = function(){
+      if (done) return;
+      done = true;
+      window.removeEventListener('afterprint', after);
+      openMail('احفظ الخطاب من نافذة الطباعة كـ PDF ثم أرفقه هنا');
+    };
+    window.addEventListener('afterprint', after);
+    requestAnimationFrame(function(){ window.print(); setTimeout(after, 0); });
   }
 
   /* قائمة المشاركة للجوال فقط: في ويندوز يصل المرفق إلى Outlook فارغاً (no_name)،
@@ -334,6 +355,7 @@
   $('share').addEventListener('click', function(){
     var r = validate(true);
     if (!r.ok){ if (r.first) r.first.focus(); return; }
+    if (!isMobile()){ printAndMail(); return; }
     if (typeof html2pdf === 'undefined'){
       alert('تعذر تحميل أداة توليد الملف. تحقق من الاتصال بالإنترنت ثم أعد المحاولة.');
       return;
