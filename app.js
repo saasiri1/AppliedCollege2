@@ -28,6 +28,10 @@
     });
   }
   function autofit(){
+    /* الورقة المخفية لا مقاس لها، فنعرضها مؤقتاً خارج الشاشة لنقيسها
+       (وإلا خرج ملف الجوال المُجهّز في الخلفية بخط أكبر من المعاينة) */
+    var wrap = $('stagewrap');
+    wrap.classList.add('measuring');
     var c = $('content'), size = 14;
     c.style.fontSize = size + 'pt';
     var guard = 0;
@@ -35,6 +39,7 @@
       size -= 0.25;
       c.style.fontSize = size + 'pt';
     }
+    wrap.classList.remove('measuring');
   }
 
   function render(){

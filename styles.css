@@ -21,6 +21,7 @@
   .panel{background:var(--card);border-inline-end:1px solid var(--line);padding:18px 18px 40px;overflow:auto;max-height:100vh}
   .stagewrap{padding:24px;display:flex;justify-content:center;align-items:flex-start;overflow:auto;height:100vh}
   .stagewrap.is-hidden{display:none}
+  .stagewrap.is-hidden.measuring{display:block;position:absolute;top:0;left:-10000px;visibility:hidden}
 
   .panel h1{font-size:17px;margin:4px 0 2px;color:var(--brand-d)}
   .panel .sub{font-size:12.5px;color:var(--muted);margin:0 0 16px;line-height:1.6}
