@@ -267,7 +267,8 @@
     var key = dataKey();
     if (pdfCache.key === key) return pdfCache.promise;
     var entry = {key: key, file: null};
-    var name = 'خطاب-التدريب-' + val('sid') + '.pdf';
+    /* اسم إنجليزي: مشاركة Chrome في ويندوز تُسقط الملفات ذات الأسماء العربية (تصل فارغة باسم no_name) */
+    var name = 'Training-Letter-' + val('sid') + '.pdf';
     entry.promise = buildPdf().then(function(blob){
       entry.file = new File([blob], name, {type: 'application/pdf'});
       return entry.file;
