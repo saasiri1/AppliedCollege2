@@ -108,10 +108,12 @@
     position:absolute;
     top:52mm;right:22mm;left:22mm;bottom:22mm;
     display:flex;flex-direction:column;
-    font-size:14pt;line-height:1.9;text-align:justify;
+    font-size:13pt;line-height:1.9;text-align:justify;
   }
   .content p{margin:0 0 4.5mm}
   .content p.tight{margin-bottom:3mm}
+  .greet{display:flex;justify-content:space-between;align-items:baseline}
+  .greet span:last-child{margin-inline-end:27mm}
   .content .indent{text-indent:8mm}
   #p_org{display:flex;justify-content:space-between;align-items:baseline;gap:12mm}
   #p_org.generic{justify-content:center;text-align:center;font-size:1.25em}
