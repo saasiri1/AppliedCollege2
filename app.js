@@ -32,7 +32,7 @@
        (وإلا خرج ملف الجوال المُجهّز في الخلفية بخط أكبر من المعاينة) */
     var wrap = $('stagewrap');
     wrap.classList.add('measuring');
-    var c = $('content'), size = 14;
+    var c = $('content'), size = 13;
     c.style.fontSize = size + 'pt';
     var guard = 0;
     while (c.scrollHeight > c.clientHeight + 1 && size > 11 && guard++ < 24){
@@ -205,13 +205,36 @@
     el.addEventListener('input', clear);
     el.addEventListener('change', clear);
   });
+  /* توليد PDF: يُحفظ الملف مباشرة على جهاز المستخدم؛ ونافذة الطباعة احتياط فقط إن تعذر رسم الورقة */
+  var PDF_LABEL = $('pdf').textContent;
+  function printLetter(){
+    requestAnimationFrame(function(){ window.print(); });
+  }
+  function saveFile(file){
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(file);
+    a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+  }
   $('pdf').addEventListener('click', function(){
     var r = validate(true);
     if (!r.ok){ if (r.first) r.first.focus(); return; }
     showLetter();
     render();
     fit();
-    requestAnimationFrame(function(){ window.print(); });
+    if (typeof html2pdf === 'undefined'){ printLetter(); return; }
+    if (pdfCache.key === dataKey() && pdfCache.file){ saveFile(pdfCache.file); return; }
+    var btn = $('pdf');
+    btn.textContent = 'جاري تجهيز الملف…';
+    btn.disabled = true;
+    var done = function(){ btn.textContent = PDF_LABEL; btn.disabled = false; };
+    prepare().then(function(file){ done(); saveFile(file); }, function(e){
+      done();
+      if (window.console) console.error('PDF build failed', e);
+      alert('تعذر حفظ الملف مباشرة، ستُفتح نافذة الطباعة: اختر «حفظ كـ PDF».\n' + errText(e));
+      printLetter();
+    });
   });
   /* إرسال الخطاب عبر قائمة المشاركة في الجهاز (البريد) */
   var SHARE_LABEL = $('share').textContent;
@@ -223,15 +246,45 @@
 
   /* Safari (الآيفون) قد يرسم الورقة بلا الترويسة في أول محاولتين،
      لذلك نعيد الرسم حتى تظهر الترويسة والنص ثم نبني الـ PDF من الصورة الناتجة */
+  /* نرسم الورقة بأنفسنا داخل صورة SVG بمقاس A4 تماماً (foreignObject) ثم ننقلها إلى canvas.
+     html2pdf يضع الورقة في منتصف الشاشة، وSafari في الكمبيوتر يزيحها فيخرج الملف فارغاً أو مقصوصاً */
+  var PAGE_W = 794, PAGE_H = 1122, PAGE_SCALE = 2;
+  function pageCss(){
+    return [].map.call(document.styleSheets, function(sh){
+      try { return [].map.call(sh.cssRules, function(r){ return r.cssText; }).join('\n'); }
+      catch(e){ return ''; }
+    }).join('\n');
+  }
   function renderPage(){
-    return html2pdf().set({
-      /* foreignObjectRendering: يستخدم محرك المتصفح فيُظهر النص العربي وعلامات الترقيم بشكل صحيح
-         scrollX/scrollY: بدونها يرسم Safari منطقة خاطئة (فارغة) إذا كانت الصفحة منزلقة للأسفل
-         height: أقل بقليل من A4 (1122.5px) حتى لا تُضاف صفحة ثانية فارغة بسبب التقريب */
-      html2canvas: {scale: 2, foreignObjectRendering: true, backgroundColor: '#fff',
-        width: 794, height: 1122, scrollX: 0, scrollY: 0, logging: false,
-        onclone: function(doc){ doc.getElementById('page').style.boxShadow = 'none'; }}
-    }).from($('page')).toCanvas().get('canvas');
+    var wrap = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
+    wrap.setAttribute('dir', 'rtl');
+    var style = document.createElementNS('http://www.w3.org/1999/xhtml', 'style');
+    style.textContent = pageCss();
+    wrap.appendChild(style);
+    var pg = $('page').cloneNode(true);
+    pg.style.boxShadow = 'none';
+    pg.style.margin = '0';
+    wrap.appendChild(pg);
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + PAGE_W + '" height="' + PAGE_H + '">' +
+      '<foreignObject x="0" y="0" width="100%" height="100%">' +
+      new XMLSerializer().serializeToString(wrap) + '</foreignObject></svg>';
+    return new Promise(function(resolve, reject){
+      var img = new Image();
+      img.onload = function(){
+        var c = document.createElement('canvas');
+        c.width = PAGE_W * PAGE_SCALE; c.height = PAGE_H * PAGE_SCALE;
+        var ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.scale(PAGE_SCALE, PAGE_SCALE);
+        /* Safari قد يرسم الصورة قبل اكتمال صور الخلفية، فننتظر قليلاً قبل الرسم */
+        setTimeout(function(){
+          try { ctx.drawImage(img, 0, 0); resolve(c); } catch(e){ reject(e); }
+        }, 50);
+      };
+      img.onerror = function(){ reject(new Error('svg image failed')); };
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    });
   }
   function inked(c, y){
     var row = c.getContext('2d').getImageData(0, Math.round(c.height * y), c.width, 1).data, n = 0;
@@ -318,11 +371,7 @@
       '&body=' + encodeURIComponent('مرفق خطاب التدريب التعاوني.\n(' + note + ')');
   }
   function downloadAndMail(file){
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(file);
-    a.download = file.name;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+    saveFile(file);
     /* مهلة قصيرة حتى لا يُلغى التنزيل عند فتح برنامج البريد */
     setTimeout(function(){ openMail('أرفق الملف ' + file.name + ' الذي تم تنزيله'); }, 600);
     resetShare();
