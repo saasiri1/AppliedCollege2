@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>إصدار خطاب التدريب التعاوني (إليكتروني) - الكلية التطبيقية</title>
-<link rel="stylesheet" href="styles.css?v=10">
+<link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
 <div class="app">
@@ -16,8 +16,8 @@
 
     <fieldset>
       <legend>بيانات الطالب</legend>
-      <label for="org">اسم المؤسسة / الجهة <span style="color:var(--muted)">(اختياري — الافتراضي: إلى من يهمه الأمر)</span></label>
-      <input type="text" id="org" placeholder="مثال: شركة النموذج للتجارة" maxlength="100">
+      <label for="org">اسم المؤسسة / الجهة</label>
+      <input type="text" id="org" value="شركة أرامكو السعودية" readonly tabindex="-1" style="background:var(--bg, #f3f3f3);cursor:default">
 
       <label for="name">اسم الطالب / ـة <span class="req">*</span></label>
       <input type="text" id="name" placeholder="مثال: محمد أحمد" maxlength="40">
@@ -96,6 +96,8 @@
       <div class="page" id="page">
         <div class="vp">وحدة التدريب والشهادات الإحترافية</div>
 
+        <div class="stamp" aria-hidden="true"></div>
+
         <div class="content" id="content">
           <p class="tight" id="p_org"></p>
           <p class="tight">تحية طيبة وبعد،</p>
@@ -136,6 +138,7 @@
 
           <div class="sign">
             <div class="t">وحدة التدريب والشهادات الإحترافية بالكلية التطبيقية</div>
+            <div class="n">د. يحيى علي محمد القحطاني</div>
             <div class="m">TPCU@kku.edu.sa</div>
           </div>
         </div>
@@ -145,6 +148,6 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 (function(){
   var $ = function(id){ return document.getElementById(id); };
-  var FIELDS = ['org','name','sid','college','major','mobile'];
+  var FIELDS = ['name','sid','college','major','mobile'];
   var MAILDOMAIN = '@kku.edu.sa';
   var STORE  = 'coopLetter.v3';
 
